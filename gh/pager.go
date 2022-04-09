@@ -1,11 +1,11 @@
-package types
+package gh
 
-type GhRepo struct {
+type Repo struct {
 	Name   string   `json:"name"`
 	Topics []string `json:"topics"`
 }
 
-type GhPull struct {
+type Pull struct {
 	HtmlUrl string `json:"html_url""`
 	State   string `json:"state"`
 	Title   string `json:"title"`
