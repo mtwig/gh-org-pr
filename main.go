@@ -2,24 +2,36 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/cli/go-gh"
+	"github.com/TwiN/go-color"
+	"github.com/mtwig/gh-org-pr/input"
+	"github.com/mtwig/gh-org-pr/theme"
+	"os"
 )
 
 func main() {
-	fmt.Println("hi world, this is the gh-org-pr extension!")
-	client, err := gh.RESTClient(nil)
+
+	org, doFilter, topics, err := input.GetOptions()
+
 	if err != nil {
-		fmt.Println(err)
-		return
+		fmt.Print(color.Ize(theme.ErrorMessage, fmt.Sprintf("unable to parse flags [%s]\n", err)))
+		os.Exit(10)
 	}
-	response := struct {Login string}{}
-	err = client.Get("user", &response)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Printf("running as %s\n", response.Login)
+	fmt.Printf("Org [%s]\n", org)
+	fmt.Printf("Do topic filtering: [%v]\n", doFilter)
+	fmt.Println("Topics ", topics)
+
+	//client, err := gh.RESTClient(nil)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	return
+	//}
+	//response := struct{ Login string }{}
+	//err = client.Get("user", &response)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	return
+	//}
+
 }
 
 // For more examples of using go-gh, see:
