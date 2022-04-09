@@ -2,7 +2,10 @@ module github.com/mtwig/gh-org-pr
 
 go 1.17
 
-require github.com/cli/go-gh v0.0.3
+require (
+	github.com/TwiN/go-color v1.1.0
+	github.com/cli/go-gh v0.0.3
+)
 
 require (
 	github.com/cli/safeexec v1.0.0 // indirect
