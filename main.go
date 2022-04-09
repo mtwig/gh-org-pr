@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/TwiN/go-color"
+	"github.com/mtwig/gh-org-pr/exitcodes"
 	"github.com/mtwig/gh-org-pr/input"
 	"github.com/mtwig/gh-org-pr/theme"
 	"os"
@@ -14,7 +15,7 @@ func main() {
 
 	if err != nil {
 		fmt.Print(color.Ize(theme.ErrorMessage, fmt.Sprintf("unable to parse flags [%s]\n", err)))
-		os.Exit(10)
+		os.Exit(exitcodes.UnableToParseInput)
 	}
 	fmt.Printf("Org [%s]\n", org)
 	fmt.Printf("Do topic filtering: [%v]\n", doFilter)
@@ -33,6 +34,3 @@ func main() {
 	//}
 
 }
-
-// For more examples of using go-gh, see:
-// https://github.com/cli/go-gh/blob/trunk/example_gh_test.go
