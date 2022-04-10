@@ -1,18 +1,33 @@
-package gh
+package ghpr
 
-type Repo struct {
-	Name   string   `json:"name"`
-	Topics []string `json:"topics"`
-}
+import (
+	"errors"
+	"regexp"
+	"strings"
+)
 
-type Pull struct {
-	HtmlUrl string `json:"html_url""`
-	State   string `json:"state"`
-	Title   string `json:"title"`
-	User    struct {
-		Login string `json:"login"`
-	} `json:"user"`
-	RequestedReviewers []struct {
-		Login string
-	} `json:"requested_reviewers"`
+// NextPageUrl accepts the Link header
+// and returns the URL of the next page
+func NextPageUrl(link string) (url string, funcErr error) {
+	pattern := regexp.MustCompile("\\<(.*)\\>")
+	var links = strings.Split(link, ",")
+	for _, link := range links {
+		if strings.HasSuffix(strings.TrimSpace(link), "rel=\"next\"") {
+			var res = pattern.FindAllStringSubmatch(link, 1)
+
+			if len(res) < 1 {
+				funcErr = errors.New("no match")
+				return
+			} else if len(res[0]) < 2 {
+				funcErr = errors.New("no sub-match")
+
+				return
+			}
+			url = res[0][1]
+			return
+		}
+
+	}
+	funcErr = errors.New("no next page")
+	return
 }
