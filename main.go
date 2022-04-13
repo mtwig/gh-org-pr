@@ -1,13 +1,17 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/TwiN/go-color"
 	"github.com/cli/go-gh"
 	graphql "github.com/cli/shurcooL-graphql"
+	ghm "github.com/mtwig/gh-org-pr/ghm"
 )
 
 func main() {
@@ -17,31 +21,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var orgFilter string
+	var repoNameFilter string
+	flag.StringVar(&orgFilter, "org", "", "organization to show filters for")
+	flag.StringVar(&repoNameFilter, "repo-filter", ".*", "only show repo names that match this pattern")
+	flag.Parse()
 
-	var graphqlResponse struct {
-		Search struct {
-			Nodes []struct {
-				PullRequest struct {
-					Title          string
-					Url            string
-					CreatedAt      time.Time
-					UpdatedAt      time.Time
-					IsDraft        bool
-					BaseRepository struct {
-						Id   string
-						Name string
-						Url  string
-					}
-					Author struct {
-						Login string
-						User  struct {
-							Name string
-						} `graphql:"... on User"`
-					}
-				} `graphql:"... on PullRequest"`
-			}
-		} `graphql:"search(type: ISSUE, first: $first, query: $query)"`
+	repoNameRegex, err := regexp.Compile(repoNameFilter)
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	// log.Printf("The filter is %s\n", orgFilter)
+	var graphqlResponse ghm.GQLResponse
 	variables := map[string]interface{}{
 		"first": graphql.Int(100),
 		"query": graphql.String("is:pr is:open review-requested:@me sort:updated-desc"),
@@ -51,28 +43,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	type PullRequest struct {
-		Title       string
-		Url         string
-		CreatedAt   time.Time
-		UpdatedAt   time.Time
-		IsDraft     bool
-		Author      string
-		AuthorLogin string
-	}
-	type Repository struct {
-		Id    string
-		Name  string
-		Url   string
-		Pulls []PullRequest
-	}
-
-	repos := make(map[string]*Repository)
+	repos := make(map[string]*ghm.Repository)
 
 	for _, node := range graphqlResponse.Search.Nodes {
 		var pr = node.PullRequest
 
-		var repository *Repository = &Repository{}
+		var repository *ghm.Repository = &ghm.Repository{}
 		r, exists := repos[pr.BaseRepository.Id]
 		if exists {
 			repository = r
@@ -80,12 +56,17 @@ func main() {
 			repository.Id = pr.BaseRepository.Id
 			repository.Name = pr.BaseRepository.Name
 			repository.Url = pr.BaseRepository.Url
-			repository.Pulls = []PullRequest{}
-			repos[pr.BaseRepository.Id] = repository
+			repository.Pulls = []ghm.PullRequest{}
+			repository.Organization.Id = pr.BaseRepository.Owner.Id
+			repository.Organization.Name = pr.BaseRepository.Owner.Login
+			if strings.EqualFold(orgFilter, "") ||
+				strings.EqualFold(repository.Organization.Name, orgFilter) {
+				repos[pr.BaseRepository.Id] = repository
+			}
 		}
 
 		// var organization Organization
-		var pullRequest PullRequest
+		var pullRequest ghm.PullRequest
 		pullRequest.Title = pr.Title
 		pullRequest.Url = pr.Url
 		pullRequest.CreatedAt = pr.CreatedAt
@@ -94,10 +75,16 @@ func main() {
 		pullRequest.Author = pr.Author.User.Name
 		pullRequest.AuthorLogin = pr.Author.Login
 
-		repository.Pulls = append(repository.Pulls, pullRequest)
+		if repoNameRegex.MatchString(repository.Name) {
+			repository.Pulls = append(repository.Pulls, pullRequest)
+		}
+
 	}
 
 	for _, repo := range repos {
+		if len(repo.Pulls) == 0 {
+			continue
+		}
 		fmt.Print(color.Ize(color.Green, fmt.Sprintf("[ %s ]\n", repo.Name)))
 		for _, pull := range repo.Pulls {
 			fmt.Print(color.Ize(color.Gray, fmt.Sprintf("  - %s ", pull.Title)))
@@ -106,27 +93,43 @@ func main() {
 			}
 			fmt.Print("\n")
 			fmt.Print(color.Ize(color.Blue, fmt.Sprintf("    %s\n", pull.Url)))
-			fmt.Printf("    added by %s (%s)\n",
-				color.Ize(color.Yellow, pull.Author),
-				color.Ize(color.Yellow, pull.AuthorLogin))
+			fmt.Printf("    added by %s ", color.Ize(color.Yellow, "@"+pull.AuthorLogin))
 
+			if !strings.EqualFold(pull.Author, "") {
+				fmt.Printf("(%s)", color.Ize(color.Yellow, pull.Author))
+			}
+			fmt.Printf("\n")
+			color.Ize(color.Yellow, pull.Author)
 			var created = getDateString(time.Since(pull.CreatedAt))
 			var modified = getDateString(time.Since(pull.UpdatedAt))
 			time.Since(pull.CreatedAt)
 
-			fmt.Printf("    Created %s\n", color.Ize(color.Purple, created))
-			fmt.Printf("    Modifed %s\n", color.Ize(color.Purple, modified))
+			fmt.Printf("    created %s, modified %s\n",
+				color.Ize(color.Purple, created+" ago"),
+				color.Ize(color.Purple, modified+" ago"))
 		}
+
 	}
 }
 
+// getDateString converts a duration into a string
+// representation.
+// [0-1) hours: report in minutes
+// [1-48] hours: report in hours
+// (48,) hours: report in days
 func getDateString(duration time.Duration) string {
-	var num = duration.Hours()
-	var unit = "hours"
+	var num float64
+	var unit string
 
-	if duration.Hours() > 48 {
+	if duration.Hours() < 1 {
+		num = duration.Minutes()
+		unit = "minutes"
+	} else if duration.Hours() > 48 {
 		num = num / 24
 		unit = "days"
+	} else {
+		num = duration.Hours()
+		unit = "hours"
 	}
 	return fmt.Sprintf("%.1f %s", num, unit)
 }
