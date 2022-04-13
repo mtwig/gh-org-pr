@@ -118,18 +118,23 @@ func main() {
 // [1-48] hours: report in hours
 // (48,) hours: report in days
 func getDateString(duration time.Duration) string {
-	var num float64
+	var num int
 	var unit string
 
+	//minutes
 	if duration.Hours() < 1 {
-		num = duration.Minutes()
-		unit = "minutes"
-	} else if duration.Hours() > 48 {
-		num = num / 24
-		unit = "days"
+		num = int(duration.Minutes())
+		unit = "minute"
+	} else if duration.Hours() >= 48 {
+		num = int(duration.Hours() / 24)
+		unit = "day"
 	} else {
-		num = duration.Hours()
-		unit = "hours"
+		num = int(duration.Hours())
+		unit = "hour"
 	}
-	return fmt.Sprintf("%.1f %s", num, unit)
+
+	if num != 1 {
+		unit += "s"
+	}
+	return fmt.Sprintf("%d %s", num, unit)
 }
